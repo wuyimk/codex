@@ -33,7 +33,7 @@ jobs:
 
       - name: Build Windows CLI
         shell: pwsh
-        run: cargo build --locked --release -p codex-cli
+        run: cargo build --release -p codex-cli
 
       - name: Verify binary
         shell: pwsh
