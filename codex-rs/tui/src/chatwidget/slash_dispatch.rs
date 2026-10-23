@@ -10,12 +10,14 @@ use crate::app::WindowsSandboxHost;
 use crate::app_event::ManagedWorktreeMode;
 use crate::app_event::ThreadGoalSetMode;
 use crate::bottom_pane::prompt_args::parse_slash_name;
+use crate::bottom_pane::popup_consts::accept_cancel_hint_line;
 use crate::bottom_pane::slash_commands::BuiltinCommandFlags;
 use crate::bottom_pane::slash_commands::ServiceTierCommand;
 use crate::bottom_pane::slash_commands::SlashCommandItem;
 use crate::bottom_pane::slash_commands::find_slash_command;
 use crate::goal_display::GOAL_USAGE;
 use crate::goal_files::GoalDraft;
+use crate::keymap::ListAction;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum SlashCommandDispatchSource {
@@ -88,20 +90,67 @@ impl ChatWidget {
         if !self.collaboration_modes_enabled() {
             self.add_info_message(
                 "Collaboration modes are disabled.".to_string(),
-                Some("Enable collaboration modes to use /plan.".to_string()),
+                Some("Enable collaboration modes to use /mode.".to_string()),
             );
             return false;
         }
-        if let Some(mask) = collaboration_modes::plan_mask(self.model_catalog.as_ref()) {
-            self.set_collaboration_mask_from_user_action(mask);
-            true
+        self.set_named_collaboration_mode(ModeKind::Plan);
+        true
+    }
+
+    fn open_mode_picker(&mut self) {
+        let current_mode = self.active_mode_kind();
+        let mode_item = |name: &str,
+                         description: &str,
+                         mode: ModeKind,
+                         current_mode: ModeKind| {
+            SelectionItem {
+                name: name.to_string(),
+                description: Some(description.to_string()),
+                is_current: current_mode == mode,
+                actions: vec![Box::new(move |tx| {
+                    tx.send(AppEvent::SetCollaborationMode(mode));
+                })],
+                dismiss_on_select: true,
+                ..Default::default()
+            }
+        };
+        let items = vec![
+            mode_item(
+                "work",
+                "Execute requests promptly with tools, code changes, and concise updates.",
+                ModeKind::Default,
+                current_mode,
+            ),
+            mode_item(
+                "chat",
+                "Discuss, explain, and brainstorm with minimal tools and concise responses.",
+                ModeKind::Plan,
+                current_mode,
+            ),
+        ];
+        let initial_selected_idx = Some(if current_mode == ModeKind::Plan {
+            1
         } else {
-            self.add_info_message(
-                "Plan mode unavailable right now.".to_string(),
-                /*hint*/ None,
-            );
-            false
-        }
+            0
+        });
+        let list_keymap = self.bottom_pane.list_keymap();
+        self.bottom_pane.show_selection_view(SelectionViewParams {
+            title: Some("Choose mode".to_string()),
+            subtitle: Some(
+                "The selection stays active for this conversation until you change it."
+                    .to_string(),
+            ),
+            footer_hint: Some(accept_cancel_hint_line(
+                list_keymap.primary_hint(ListAction::Accept),
+                "to confirm",
+                list_keymap.primary_hint(ListAction::Cancel),
+                "to cancel",
+            )),
+            items,
+            initial_selected_idx,
+            ..SelectionViewParams::picker()
+        });
     }
 
     fn request_side_conversation(
@@ -377,6 +426,9 @@ impl ChatWidget {
             SlashCommand::Model => {
                 self.open_model_popup();
                 self.defer_input_until_settings_applied();
+            }
+            SlashCommand::Mode => {
+                self.open_mode_picker();
             }
             SlashCommand::Plan => {
                 self.apply_plan_slash_command();
@@ -699,6 +751,22 @@ impl ChatWidget {
         let trimmed = args.trim();
         if trimmed.is_empty() {
             self.dispatch_command(cmd);
+            return;
+        }
+
+        if cmd == SlashCommand::Mode {
+            let mode = match trimmed.to_ascii_lowercase().as_str() {
+                "work" => Some(ModeKind::Default),
+                "chat" | "plan" => Some(ModeKind::Plan),
+                _ => None,
+            };
+            if let Some(mode) = mode {
+                self.set_named_collaboration_mode(mode);
+            } else {
+                self.add_error_message(
+                    "Unknown mode. Use /mode, /mode work, or /mode chat.".to_string(),
+                );
+            }
             return;
         }
 
@@ -1314,6 +1382,7 @@ impl ChatWidget {
             | SlashCommand::Init
             | SlashCommand::Compact
             | SlashCommand::Review
+            | SlashCommand::Mode
             | SlashCommand::Model
             | SlashCommand::Plan
             | SlashCommand::Goal

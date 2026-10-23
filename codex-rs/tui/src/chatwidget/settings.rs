@@ -476,10 +476,13 @@ impl ChatWidget {
         if !self.collaboration_modes_enabled() {
             return self.current_collaboration_mode.clone();
         }
-        self.active_collaboration_mask.as_ref().map_or_else(
+        let mut effective = self.active_collaboration_mask.as_ref().map_or_else(
             || self.current_collaboration_mode.clone(),
             |mask| self.current_collaboration_mode.apply_mask(mask),
-        )
+        );
+        effective.settings.developer_instructions =
+            Some(collaboration_modes::instructions(effective.mode).to_string());
+        effective
     }
 
     pub(super) fn refresh_model_display(&mut self) {
@@ -613,7 +616,7 @@ impl ChatWidget {
             };
         }
         self.active_collaboration_mask = Some(CollaborationModeMask {
-            name: mode_kind.display_name().to_string(),
+            name: collaboration_modes::display_name(mode_kind).to_string(),
             mode: Some(mode_kind),
             model: Some(settings.model.clone()),
             reasoning_effort: Some(settings.reasoning_effort.clone()),
@@ -640,7 +643,7 @@ impl ChatWidget {
         let active_mode = self.active_mode_kind();
         active_mode
             .is_tui_visible()
-            .then_some(active_mode.display_name())
+            .then_some(collaboration_modes::display_name(active_mode))
     }
 
     fn collaboration_mode_indicator(&self) -> Option<CollaborationModeIndicator> {
@@ -648,27 +651,20 @@ impl ChatWidget {
             return None;
         }
         match self.active_mode_kind() {
-            ModeKind::Plan => Some(CollaborationModeIndicator::Plan),
-            ModeKind::Default => None,
+            ModeKind::Plan => Some(CollaborationModeIndicator::Chat),
+            ModeKind::Default => Some(CollaborationModeIndicator::Work),
         }
     }
 
     pub(super) fn update_collaboration_mode_indicator(&mut self) {
         let indicator = self.collaboration_mode_indicator();
-        let goal_indicator = if indicator.is_none() {
-            self.goal_status_indicator(Instant::now())
-        } else {
-            None
-        };
+        let goal_indicator = self.goal_status_indicator(Instant::now());
         self.current_goal_status_indicator = goal_indicator.clone();
         self.bottom_pane.set_collaboration_mode_indicator(indicator);
         self.bottom_pane.set_goal_status_indicator(goal_indicator);
     }
 
     pub(crate) fn refresh_goal_status_indicator_for_time_tick(&mut self) {
-        if self.collaboration_mode_indicator().is_some() {
-            return;
-        }
         let goal_indicator = self.goal_status_indicator(Instant::now());
         if goal_indicator != self.current_goal_status_indicator {
             self.current_goal_status_indicator = goal_indicator.clone();
@@ -706,18 +702,34 @@ impl ChatWidget {
         self.update_collaboration_mode_indicator();
     }
 
-    /// Cycle to the next collaboration mode variant (Plan -> Default -> Plan).
+    /// Cycle between the two user-facing modes (Work <-> Chat).
     pub(super) fn cycle_collaboration_mode(&mut self) {
         if !self.collaboration_modes_enabled() {
             return;
         }
 
-        if let Some(next_mask) = collaboration_modes::next_mask(
-            self.model_catalog.as_ref(),
-            self.active_collaboration_mask.as_ref(),
-        ) {
-            self.set_collaboration_mask_from_user_action(next_mask);
+        let next_mode = match self.active_mode_kind() {
+            ModeKind::Default => ModeKind::Plan,
+            ModeKind::Plan => ModeKind::Default,
+        };
+        self.set_named_collaboration_mode(next_mode);
+    }
+
+    /// Apply a user-facing mode while retaining its canonical backend kind.
+    pub(crate) fn set_named_collaboration_mode(&mut self, mode: ModeKind) {
+        if !mode.is_tui_visible() {
+            return;
         }
+        let mask = CollaborationModeMask {
+            name: collaboration_modes::display_name(mode).to_string(),
+            mode: Some(mode),
+            model: Some(self.current_model().to_string()),
+            reasoning_effort: Some(self.effective_reasoning_effort()),
+            developer_instructions: Some(Some(
+                collaboration_modes::instructions(mode).to_string(),
+            )),
+        };
+        self.set_collaboration_mask_from_user_action(mask);
     }
 
     pub(crate) fn set_collaboration_mask_from_user_action(&mut self, mask: CollaborationModeMask) {
@@ -760,7 +772,7 @@ impl ChatWidget {
                 message.push_str(reasoning_label);
             }
             message.push_str(" for ");
-            message.push_str(next_mode.display_name());
+            message.push_str(collaboration_modes::display_name(next_mode));
             message.push_str(" mode.");
             self.add_info_message(message, /*hint*/ None);
         }

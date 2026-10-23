@@ -662,6 +662,10 @@ mod tests {
             !cmds.iter().any(|cmd| cmd == "plan"),
             "expected '/plan' to be hidden when collaboration modes are disabled, got {cmds:?}"
         );
+        assert!(
+            !cmds.iter().any(|cmd| cmd == "mode"),
+            "expected '/mode' to be hidden when collaboration modes are disabled, got {cmds:?}"
+        );
     }
 
     #[test]
@@ -691,6 +695,23 @@ mod tests {
             }
             other => panic!("expected plan to be selected for exact match, got {other:?}"),
         }
+    }
+
+    #[test]
+    fn mode_command_visible_when_collaboration_modes_enabled() {
+        let mut popup = CommandPopup::new(
+            CommandPopupFlags {
+                collaboration_modes_enabled: true,
+                ..CommandPopupFlags::default()
+            },
+            Vec::new(),
+        );
+        popup.on_composer_text_change("/mode".to_string());
+
+        assert_eq!(
+            popup.selected_item(),
+            Some(CommandItem::Builtin(SlashCommand::Mode))
+        );
     }
 
     #[test]

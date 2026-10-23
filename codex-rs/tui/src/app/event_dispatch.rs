@@ -2128,6 +2128,9 @@ impl App {
                         .await;
                 }
             }
+            AppEvent::SetCollaborationMode(mode) => {
+                self.chat_widget.set_named_collaboration_mode(mode);
+            }
             AppEvent::AstraSelectedFromModelPicker { .. } => unreachable!("picker event unwrapped"),
             AppEvent::BackgroundVoiceError { thread_id, message } => {
                 if self.chat_widget.thread_id() == Some(thread_id) {

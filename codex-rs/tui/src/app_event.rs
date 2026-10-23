@@ -1231,6 +1231,9 @@ pub(crate) enum AppEvent {
     /// Update the current model slug in the running app and widget.
     UpdateModel(String),
 
+    /// Apply one of the user-facing collaboration modes to the current session.
+    SetCollaborationMode(codex_protocol::config_types::ModeKind),
+
     /// Apply a final Astra picker action and offer the flourish only if it changed the model on
     /// its original task. Automatic model updates do not use this event.
     AstraSelectedFromModelPicker {

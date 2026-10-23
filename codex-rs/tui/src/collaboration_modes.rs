@@ -11,6 +11,51 @@ use std::time::Duration;
 
 use crate::model_catalog::ModelCatalog;
 
+pub(crate) const WORK_MODE_INSTRUCTIONS: &str = r#"# Work mode
+
+You are in persistent Work mode for this conversation until the user switches modes with `/mode`.
+
+Execute the user's plan or explicit request promptly. Use tools, edit files, run commands, and
+verify results as needed within the granted permissions. Follow the normal approval and sandbox
+rules.
+
+Keep responses concise. Do not narrate routine reasoning or restate the plan. Report only essential
+progress, decisions, blockers, and the final result. Ask only when safety, missing authority, or a
+material choice requires the user's input.
+"#;
+
+pub(crate) const CHAT_MODE_INSTRUCTIONS: &str = r#"# Chat mode
+
+You are in persistent Chat mode for this conversation until the user switches modes with `/mode`.
+
+Focus on discussion: answering questions, explaining ideas, brainstorming, generating options, and
+recommending solutions. Respond in text and use only necessary read-only file inspection and
+permitted web search. Prefer not to use tools. Do not edit files, execute work, change external
+state, or run commands that perform an action.
+
+Web search is off by default. Use it in the current turn only when the user explicitly permits it.
+If search is genuinely necessary without that permission, explain what must be checked and ask
+first. Permission applies only to the turn in which it was granted.
+
+Be concise and measured. Keep simple questions short. For complex questions, explain the key
+reasoning, tradeoffs, alternatives, and a recommendation with enough detail to be useful without
+covering every detail. Prioritize a quick response and avoid unnecessary deep reasoning.
+"#;
+
+pub(crate) const fn display_name(kind: ModeKind) -> &'static str {
+    match kind {
+        ModeKind::Default => "Work",
+        ModeKind::Plan => "Chat",
+    }
+}
+
+pub(crate) const fn instructions(kind: ModeKind) -> &'static str {
+    match kind {
+        ModeKind::Default => WORK_MODE_INSTRUCTIONS,
+        ModeKind::Plan => CHAT_MODE_INSTRUCTIONS,
+    }
+}
+
 fn filtered_presets(model_catalog: &ModelCatalog) -> Vec<CollaborationModeMask> {
     model_catalog
         .collaboration_modes

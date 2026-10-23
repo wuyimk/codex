@@ -1,0 +1,49 @@
+name: Build Codex Mode
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build-windows:
+    runs-on: windows-latest
+    timeout-minutes: 120
+    defaults:
+      run:
+        working-directory: codex-rs
+
+    steps:
+      - name: Check out source
+        uses: actions/checkout@v4
+
+      - name: Install the pinned Rust toolchain
+        shell: pwsh
+        run: rustup show
+
+      - name: Cache Rust build artifacts
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: codex-rs -> target
+
+      - name: Format patched source
+        shell: pwsh
+        run: cargo fmt --all
+
+      - name: Build Windows CLI
+        shell: pwsh
+        run: cargo build --locked --release -p codex-cli
+
+      - name: Verify binary
+        shell: pwsh
+        run: |
+          Get-Item target/release/codex.exe | Format-List Name,Length,LastWriteTime
+          & target/release/codex.exe --version
+
+      - name: Upload Windows binary
+        uses: actions/upload-artifact@v4
+        with:
+          name: codex-mode-windows-x86_64
+          path: codex-rs/target/release/codex.exe
+          if-no-files-found: error

@@ -509,6 +509,7 @@ fn parent_owned_command_is_allowed(command: SlashCommand, args: &str) -> bool {
                 | SlashCommand::ElevateSandbox
                 | SlashCommand::Experimental
                 | SlashCommand::Memories
+                | SlashCommand::Mode
                 | SlashCommand::Quit
                 | SlashCommand::Exit
                 | SlashCommand::Logout

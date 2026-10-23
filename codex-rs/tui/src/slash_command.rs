@@ -13,6 +13,7 @@ pub enum SlashCommand {
     // DO NOT ALPHA-SORT! Enum order is presentation order in the popup, so
     // more frequently used commands should be listed first.
     Model,
+    Mode,
     Daybreak,
     Ide,
     Permissions,
@@ -132,11 +133,12 @@ impl SlashCommand {
             SlashCommand::MemoryDrop => "DO NOT USE",
             SlashCommand::MemoryUpdate => "DO NOT USE",
             SlashCommand::Model => "choose what model and reasoning effort to use",
+            SlashCommand::Mode => "choose Work or Chat mode",
             SlashCommand::Daybreak => "turn Daybreak on or off",
             SlashCommand::Ide => {
                 "include current selection, open files, and other context from your IDE"
             }
-            SlashCommand::Plan => "switch to Plan mode",
+            SlashCommand::Plan => "switch to Chat mode",
             SlashCommand::Voice => "start or stop voice; use /voice settings to choose a voice",
             SlashCommand::Goal => "set or view the goal for a long-running task",
             SlashCommand::Agents => "open the agent command center",
@@ -175,6 +177,7 @@ impl SlashCommand {
                 | SlashCommand::New
                 | SlashCommand::Clear
                 | SlashCommand::Fork
+                | SlashCommand::Mode
                 | SlashCommand::Plan
                 | SlashCommand::Goal
                 | SlashCommand::Voice
@@ -258,6 +261,7 @@ impl SlashCommand {
             | SlashCommand::Memories
             | SlashCommand::Import
             | SlashCommand::Review
+            | SlashCommand::Mode
             | SlashCommand::Plan
             | SlashCommand::Cd
             | SlashCommand::Clear
@@ -346,6 +350,12 @@ mod tests {
     fn pet_alias_parses_to_pets_command() {
         assert_eq!(SlashCommand::Pets.command(), "pets");
         assert_eq!(SlashCommand::from_str("pet"), Ok(SlashCommand::Pets));
+    }
+
+    #[test]
+    fn mode_command_is_canonical_name() {
+        assert_eq!(SlashCommand::Mode.command(), "mode");
+        assert_eq!(SlashCommand::from_str("mode"), Ok(SlashCommand::Mode));
     }
 
     #[test]
